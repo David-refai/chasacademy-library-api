@@ -3,7 +3,7 @@ package com.library.api.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
-// كيان المستخدم - يُخزَّن في جدول USERS في قاعدة البيانات
+// Represents a user stored in the USERS table
 @Entity
 @Table(name = "users")
 @Getter
@@ -17,15 +17,15 @@ public class AppUser {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // اسم المستخدم يجب أن يكون فريداً في كل قاعدة البيانات
+    // Username must be unique across the entire database
     @Column(unique = true, nullable = false)
     private String username;
 
-    // كلمة المرور مُشفّرة بخوارزمية BCrypt - لا نخزّن كلمات المرور كنص عادي أبداً
+    // Password stored as a BCrypt hash — never store plain-text passwords
     @Column(nullable = false)
     private String password;
 
-    // الدور: ROLE_USER للمستخدم العادي، ROLE_ADMIN للمدير
+    // ROLE_USER for regular users, ROLE_ADMIN for administrators
     @Column(nullable = false)
     private String role;
 }

@@ -1,0 +1,48 @@
+version: '3.8'
+
+# Start both Redis and Vault with a single command: docker-compose up -d
+
+services:
+
+  # Redis: fast in-memory store used as the cache backend
+  redis:
+    image: redis:7-alpine
+    container_name: library-redis
+    ports:
+      - "6379:6379"
+    # Save a snapshot every 60 seconds if at least 1 key changed
+    command: redis-server --save 60 1
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Vault: secrets manager for sensitive configuration (passwords, API keys)
+  # dev mode: starts immediately without complex setup — suitable for development only
+  # In production: run Vault in production mode with proper unseal keys
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: library-vault
+    ports:
+      - "8200:8200"
+    environment:
+      # Root token used to authenticate against the dev Vault instance
+      VAULT_DEV_ROOT_TOKEN_ID: "dev-root-token"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    cap_add:
+      # IPC_LOCK prevents Vault from swapping secrets to disk
+      - IPC_LOCK
+    command: server -dev
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=http://localhost:8200"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  # Named volume so Redis data persists across container restarts
+  redis_data:
+    driver: local

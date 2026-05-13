@@ -10,19 +10,18 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.*;
 
-// معالج مركزي لكل الأخطاء في التطبيق
-// بدونه، Spring يُعيد أشكالاً مختلفة من رسائل الخطأ حسب نوع الاستثناء
-// معه، كل الأخطاء تأتي بنفس الشكل الموحد مما يُسهّل عمل الواجهة الأمامية
+// Centralized error handler for all controllers
+// Without this, Spring returns different error formats for different exceptions.
+// With this, every error comes back in the same consistent JSON structure.
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // معالجة أخطاء التحقق من الإدخال (@Valid فشل)
-    // مثال: أرسل المستخدم ISBN من 5 أرقام بدلاً من 13
+    // Handles validation failures from @Valid — e.g. missing field or invalid ISBN format
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationErrors(
             MethodArgumentNotValidException ex) {
 
-        // نجمع كل أخطاء الحقول في map واضحة
+        // Collect all field-level validation errors into a readable map
         Map<String, String> fieldErrors = new LinkedHashMap<>();
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
             fieldErrors.put(error.getField(), error.getDefaultMessage());
@@ -36,7 +35,7 @@ public class GlobalExceptionHandler {
         ));
     }
 
-    // معالجة "مورد غير موجود" مثل كتاب بـ ID غير موجود
+    // Handles "resource not found" — e.g. book with a given ID does not exist
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
@@ -46,7 +45,7 @@ public class GlobalExceptionHandler {
         ));
     }
 
-    // معالجة أخطاء المنطق مثل: تسجيل بـ username مستخدم أو ISBN مكرر
+    // Handles business rule violations — e.g. duplicate ISBN or duplicate username
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
         return ResponseEntity.badRequest().body(Map.of(
@@ -56,7 +55,7 @@ public class GlobalExceptionHandler {
         ));
     }
 
-    // معالجة أخطاء الحالة مثل: محاولة استعارة كتاب مُستعار أو إعادة كتاب مُعاد
+    // Handles state conflicts — e.g. borrowing an already-borrowed book or returning a returned book
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
@@ -66,7 +65,7 @@ public class GlobalExceptionHandler {
         ));
     }
 
-    // معالجة محاولة الوصول بدون صلاحية مثل: مستخدم عادي يحاول إضافة كتاب
+    // Handles unauthorized access — e.g. a regular user trying to add a book
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
@@ -76,7 +75,7 @@ public class GlobalExceptionHandler {
         ));
     }
 
-    // معالجة بيانات تسجيل دخول خاطئة
+    // Handles wrong username or password during login
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Map<String, Object>> handleBadCredentials(BadCredentialsException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(

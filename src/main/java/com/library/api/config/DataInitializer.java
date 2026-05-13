@@ -9,8 +9,8 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
-// يعمل عند بدء التطبيق لإنشاء بيانات تجريبية في قاعدة البيانات
-// مفيد لاختبار التطبيق بدون إدخال بيانات يدوي
+// Runs on application startup to seed the H2 database with test users and sample books
+// Useful for testing the API without manually entering data
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -27,17 +27,17 @@ public class DataInitializer implements ApplicationRunner {
     }
 
     private void seedUsers() {
-        // ننشئ المستخدمين فقط إذا لم يكونوا موجودين
+        // Skip seeding if users already exist — prevents duplicates on restart
         if (userRepository.count() > 0) return;
 
-        // حساب المدير - يمكنه إضافة وتعديل وحذف الكتب
+        // Admin account — can add, update, and delete books
         userRepository.save(AppUser.builder()
                 .username("admin")
                 .password(passwordEncoder.encode("admin1234"))
                 .role("ROLE_ADMIN")
                 .build());
 
-        // حساب مستخدم عادي - يمكنه استعارة الكتب فقط
+        // Regular user account — can only borrow and return books
         userRepository.save(AppUser.builder()
                 .username("user1")
                 .password(passwordEncoder.encode("user1234"))

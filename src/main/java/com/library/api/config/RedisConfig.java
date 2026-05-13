@@ -8,20 +8,21 @@ import org.springframework.data.redis.serializer.*;
 
 import java.time.Duration;
 
-// إعداد Redis كمستودع للـ cache
-// Redis = مخزن بيانات سريع جداً في الذاكرة يُستخدم لتخزين نتائج الاستعلامات الثقيلة
+// Configures Redis as the cache backend
+// Redis is a fast in-memory store used to cache frequently accessed data,
+// which avoids repeated database queries and significantly reduces response times
 @Configuration
 public class RedisConfig {
 
     @Bean
     public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
-        // نُخزّن البيانات في Redis بصيغة JSON (يمكن قراءتها بسهولة)
+        // Store cached objects as JSON (human-readable and language-agnostic)
         var jsonSerializer = new GenericJackson2JsonRedisSerializer();
 
-        // الإعداد الافتراضي لكل الـ caches
+        // Default configuration applied to all caches unless overridden
         var defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofMinutes(10))    // الـ cache ينتهي بعد 10 دقائق
-                .disableCachingNullValues()           // لا نُخزّن null لأنه لا فائدة منه
+                .entryTtl(Duration.ofMinutes(10))    // Cache entries expire after 10 minutes
+                .disableCachingNullValues()           // Never cache null values
                 .serializeValuesWith(
                         RedisSerializationContext.SerializationPair
                                 .fromSerializer(jsonSerializer)
@@ -29,10 +30,10 @@ public class RedisConfig {
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)
-                // cache الكتب يعيش 30 دقيقة لأن بياناتها لا تتغير كثيراً
+                // Books cache lives 30 minutes — book data rarely changes
                 .withCacheConfiguration("books",
                         defaultConfig.entryTtl(Duration.ofMinutes(30)))
-                // cache الاستعارات يعيش 5 دقائق فقط لأن حالتها تتغير أكثر
+                // Loans cache lives 5 minutes — loan state changes more frequently
                 .withCacheConfiguration("loans",
                         defaultConfig.entryTtl(Duration.ofMinutes(5)))
                 .build();

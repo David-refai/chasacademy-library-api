@@ -3,8 +3,8 @@ package com.library.api.dto;
 import lombok.Data;
 import java.io.Serializable;
 
-// بيانات الكتاب التي تُرسَل للعميل
-// يجب أن يُطبّق Serializable حتى يمكن تخزينه في Redis
+// Book data returned to the client
+// Must implement Serializable so it can be stored in Redis as a Java object
 @Data
 public class BookResponseDto implements Serializable {
 
@@ -14,6 +14,6 @@ public class BookResponseDto implements Serializable {
     private String isbn;
     private Integer publishedYear;
 
-    // يُخبر العميل هل الكتاب متاح للاستعارة أم لا
+    // Tells the client whether the book is available for borrowing
     private boolean available;
 }

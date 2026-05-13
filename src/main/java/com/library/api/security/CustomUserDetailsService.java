@@ -8,8 +8,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-// يخبر Spring Security كيفية تحميل بيانات المستخدم من قاعدة البيانات
-// يُستخدم عند تسجيل الدخول وعند التحقق من الـ JWT في كل طلب
+// Tells Spring Security how to load a user from the database
+// Used during login and on every request to verify the JWT token's subject
 @Service
 @RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
@@ -18,15 +18,15 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        // ابحث عن المستخدم في قاعدة البيانات
+        // Look up the user in the database
         var user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
-        // حوّل AppUser إلى UserDetails الذي يفهمه Spring Security
+        // Convert AppUser into Spring Security's UserDetails format
+        // e.g. ROLE_ADMIN becomes a GrantedAuthority used by @PreAuthorize
         return new org.springframework.security.core.userdetails.User(
                 user.getUsername(),
                 user.getPassword(),
-                // مثال: ROLE_ADMIN تُصبح GrantedAuthority تُستخدم في @PreAuthorize
                 List.of(new SimpleGrantedAuthority(user.getRole()))
         );
     }

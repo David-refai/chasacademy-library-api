@@ -16,21 +16,21 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-// اختبارات وحدة لـ BookService
-// نستخدم Mockito لمحاكاة الـ repository بدلاً من قاعدة بيانات حقيقية
-// هذا يجعل الاختبارات سريعة ومعزولة عن التبعيات الخارجية
+// Unit tests for BookService
+// Mockito is used to simulate the repository without a real database
+// Tests run fast and are completely isolated from external dependencies
 @ExtendWith(MockitoExtension.class)
 class BookServiceTest {
 
-    // @Mock ينشئ نسخة وهمية من BookRepository تتحكم في إجاباتها
+    // @Mock creates a fake BookRepository that we control
     @Mock
     private BookRepository bookRepository;
 
-    // @InjectMocks ينشئ BookService ويُدخل الـ mock فيه
+    // @InjectMocks creates BookService and injects the mock into it
     @InjectMocks
     private BookService bookService;
 
-    // بيانات الاختبار - نُعيد استخدامها في عدة اختبارات
+    // Shared test data reused across multiple tests
     private Book testBook;
 
     @BeforeEach
@@ -46,59 +46,56 @@ class BookServiceTest {
     }
 
     @Test
-    @DisplayName("getBookById: يجب أن يُعيد الكتاب عندما يكون موجوداً")
+    @DisplayName("getBookById: should return book when it exists")
     void getBookById_shouldReturnBook_whenExists() {
-        // Arrange: نُعلّم الـ mock أن يُعيد testBook عند البحث بـ id=1
+        // Arrange: tell the mock to return testBook when searching by id=1
         when(bookRepository.findById(1L)).thenReturn(Optional.of(testBook));
 
-        // Act: نستدعي الدالة المراد اختبارها
+        // Act: call the method under test
         BookResponseDto result = bookService.getBookById(1L);
 
-        // Assert: نتحقق أن النتيجة صحيحة
+        // Assert: verify the result matches the expected data
         assertThat(result.getId()).isEqualTo(1L);
         assertThat(result.getTitle()).isEqualTo("Clean Code");
         assertThat(result.getAuthor()).isEqualTo("Robert C. Martin");
         assertThat(result.isAvailable()).isTrue();
 
-        // نتأكد أن الـ repository استُدعي مرة واحدة فقط
+        // Confirm the repository was called exactly once
         verify(bookRepository, times(1)).findById(1L);
     }
 
     @Test
-    @DisplayName("getBookById: يجب أن يرمي خطأ عندما لا يوجد الكتاب")
+    @DisplayName("getBookById: should throw RuntimeException when book does not exist")
     void getBookById_shouldThrowException_whenNotFound() {
         when(bookRepository.findById(99L)).thenReturn(Optional.empty());
 
-        // نتوقع أن تُرمى RuntimeException مع رسالة تحتوي على "Book not found"
+        // Expect RuntimeException with a message containing "Book not found"
         assertThatThrownBy(() -> bookService.getBookById(99L))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Book not found");
     }
 
     @Test
-    @DisplayName("createBook: يجب أن يرفض الكتاب إذا كان الـ ISBN موجوداً مسبقاً")
+    @DisplayName("createBook: should throw IllegalArgumentException when ISBN already exists")
     void createBook_shouldThrowException_whenIsbnAlreadyExists() {
-        // نُحضّر طلب إنشاء كتاب بـ ISBN موجود
         BookRequestDto request = new BookRequestDto();
         request.setTitle("Clean Code 2nd Edition");
         request.setAuthor("Robert C. Martin");
-        request.setIsbn("9780132350884");  // نفس الـ ISBN
+        request.setIsbn("9780132350884");  // Same ISBN as an existing book
         request.setPublishedYear(2024);
 
-        // الـ repository يقول أن هذا الـ ISBN موجود مسبقاً
         when(bookRepository.existsByIsbn("9780132350884")).thenReturn(true);
 
-        // يجب أن يرمي IllegalArgumentException
         assertThatThrownBy(() -> bookService.createBook(request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("already exists");
 
-        // نتأكد أن save لم يُستدعَ لأننا رفضنا قبل الوصول إليه
+        // Confirm save was never called because we rejected early
         verify(bookRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("createBook: يجب أن يحفظ الكتاب ويُعيده عند بيانات صحيحة")
+    @DisplayName("createBook: should save and return book when input is valid")
     void createBook_shouldSaveAndReturnBook_whenValid() {
         BookRequestDto request = new BookRequestDto();
         request.setTitle("New Book");
@@ -106,10 +103,9 @@ class BookServiceTest {
         request.setIsbn("9781234567890");
         request.setPublishedYear(2024);
 
-        // الـ ISBN غير موجود
         when(bookRepository.existsByIsbn("9781234567890")).thenReturn(false);
 
-        // الـ repository يُعيد الكتاب بعد الحفظ مع id مُعيَّن
+        // Simulate the repository assigning an ID after save
         Book savedBook = Book.builder()
                 .id(10L)
                 .title("New Book")
@@ -128,7 +124,7 @@ class BookServiceTest {
     }
 
     @Test
-    @DisplayName("getAllBooks: يجب أن يُعيد الكتب بشكل مُقسَّم (paginated)")
+    @DisplayName("getAllBooks: should return paginated results")
     void getAllBooks_shouldReturnPagedBooks() {
         Pageable pageable = PageRequest.of(0, 10);
         Page<Book> bookPage = new PageImpl<>(List.of(testBook), pageable, 1);
@@ -143,7 +139,7 @@ class BookServiceTest {
     }
 
     @Test
-    @DisplayName("deleteBook: يجب أن يرمي خطأ عند محاولة حذف كتاب غير موجود")
+    @DisplayName("deleteBook: should throw RuntimeException when book does not exist")
     void deleteBook_shouldThrowException_whenBookNotFound() {
         when(bookRepository.existsById(999L)).thenReturn(false);
 
@@ -151,6 +147,7 @@ class BookServiceTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Book not found");
 
+        // Confirm deleteById was never called
         verify(bookRepository, never()).deleteById(any());
     }
 }

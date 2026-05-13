@@ -2,8 +2,8 @@ spring:
   application:
     name: library-api
 
-  # ===== قاعدة البيانات =====
-  # H2 قاعدة بيانات في الذاكرة - لا تحتاج تثبيتاً، تبدأ مع التطبيق وتُحذف عند إيقافه
+  # ===== DATABASE =====
+  # H2 is an in-memory database — no installation needed, resets on every restart
   datasource:
     url: jdbc:h2:mem:librarydb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     driver-class-name: org.h2.Driver
@@ -13,32 +13,32 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
-      # create-drop: يُنشئ جداول عند البدء ويحذفها عند الإيقاف (مثالي للتطوير)
-      # في الإنتاج: استخدم validate أو none
+      # create-drop: recreates the schema on startup and drops it on shutdown (dev only)
+      # In production use: validate or none
       ddl-auto: create-drop
-    show-sql: false  # اجعلها true إذا أردت رؤية استعلامات SQL في السجل
+    show-sql: false  # Set to true to print SQL queries to the console
 
-  # H2 console لفحص البيانات عبر المتصفح: http://localhost:8080/h2-console
+  # H2 web console — inspect data in the browser at http://localhost:8080/h2-console
   h2:
     console:
       enabled: true
       path: /h2-console
 
-  # ===== Redis (التخزين المؤقت) =====
-  # Redis مخزن بيانات سريع في الذاكرة - يُسرّع الاستعلامات المتكررة
+  # ===== REDIS (CACHING) =====
+  # Redis is a fast in-memory store used to cache frequently accessed data
   data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      timeout: 2000ms  # إذا لم يستجب Redis خلال ثانيتين، يُعطي خطأ
+      timeout: 2000ms  # If Redis does not respond within 2 seconds, fail fast
 
-  # نوع الـ cache: redis = يستخدم Redis، simple = في الذاكرة (للتطوير بدون Redis)
+  # Cache type: redis = use Redis, simple = in-memory fallback (no Redis needed)
   cache:
     type: redis
 
-  # ===== Spring Vault (إدارة الأسرار) =====
-  # Vault يُخزّن المعلومات الحساسة خارج الكود مثل كلمات المرور ومفاتيح API
-  # optional: يعني التطبيق يعمل حتى لو Vault غير متاح
+  # ===== SPRING VAULT (SECRETS MANAGEMENT) =====
+  # Vault stores sensitive configuration (passwords, keys) outside the codebase
+  # The optional: prefix means the app starts normally even if Vault is not running
   config:
     import: "optional:vault://"
 
@@ -53,18 +53,18 @@ spring:
       kv:
         enabled: true
         backend: secret
-        # Spring سيقرأ الأسرار من المسار: secret/library-api
+        # Spring reads secrets from the Vault path: secret/library-api
         default-context: library-api
 
 # ===== JWT =====
-# في الإنتاج، يجب أن يأتي JWT_SECRET من Vault وليس من هنا
-# الأمر للحفظ في Vault: vault kv put secret/library-api app.jwt.secret="your-strong-secret"
+# In production, app.jwt.secret should come from Vault, not from this file
+# Store it with: vault kv put secret/library-api app.jwt.secret="your-strong-secret"
 app:
   jwt:
     secret: ${JWT_SECRET:library-api-super-secret-key-minimum-256-bits-long-for-hmac-sha256}
-    expiration-ms: 86400000  # مدة صلاحية الـ token: 24 ساعة
+    expiration-ms: 86400000  # Token validity: 24 hours
 
-# ===== Actuator (مراقبة التطبيق) =====
+# ===== ACTUATOR (MONITORING) =====
 management:
   endpoints:
     web:
@@ -74,20 +74,20 @@ management:
     health:
       show-details: when-authorized
 
-# ===== Circuit Breaker (Resilience4j) - VG =====
+# ===== CIRCUIT BREAKER (Resilience4j) — VG =====
 resilience4j:
   circuitbreaker:
     instances:
       openLibrary:
-        # يُسجّل صحة الـ circuit في /actuator/health
+        # Register circuit breaker state in /actuator/health
         register-health-indicator: true
-        # نحسب نسبة الفشل من آخر 10 طلبات
+        # Measure failure rate over the last 10 calls
         sliding-window-size: 10
-        # إذا فشل 50% من الطلبات، تُفتح الدائرة (يتوقف عن الاتصال)
+        # Open the circuit if 50% or more of the last 10 calls failed
         failure-rate-threshold: 50
-        # ننتظر 30 ثانية قبل المحاولة مجدداً
+        # Wait 30 seconds in the OPEN state before trying again (HALF-OPEN)
         wait-duration-in-open-state: 30s
-        # في حالة HALF-OPEN، نُرسل 3 طلبات تجريبية فقط
+        # In HALF-OPEN state, allow 3 test requests to check if the service recovered
         permitted-number-of-calls-in-half-open-state: 3
 
 logging:

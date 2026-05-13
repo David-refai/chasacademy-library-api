@@ -3,6 +3,7 @@ package com.library.api.filter;
 import io.github.bucket4j.*;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
+import org.springframework.lang.NonNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -12,39 +13,38 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-// فلتر Rate Limiting باستخدام خوارزمية Token Bucket من مكتبة Bucket4j
+// Rate limiting filter using the Token Bucket algorithm via Bucket4j
 //
-// كيف تعمل خوارزمية Token Bucket:
-// - كل IP يمتلك "دلو" يحمل عدداً محدداً من الرموز (tokens)
-// - كل طلب يستهلك رمزاً واحداً من الدلو
-// - الدلو يُعاد ملؤه تدريجياً بمرور الوقت
-// - إذا فرغ الدلو، يُرفض الطلب بخطأ 429 Too Many Requests
+// How Token Bucket works:
+// - Each IP address gets a bucket that holds a fixed number of tokens
+// - Each incoming request consumes one token from the bucket
+// - The bucket refills gradually over time (60 tokens per minute here)
+// - When the bucket is empty the request is rejected with HTTP 429 Too Many Requests
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    // كل IP يحصل على دلو منفصل مُخزَّن في الذاكرة
-    // ConcurrentHashMap آمن للاستخدام مع عدة threads في نفس الوقت
+    // Each IP address gets its own bucket stored in a thread-safe map
     private final Map<String, Bucket> ipBuckets = new ConcurrentHashMap<>();
 
-    // الحد الأقصى: 60 طلباً في الدقيقة لكل IP
+    // Maximum allowed requests per minute per IP address
     private static final int MAX_REQUESTS_PER_MINUTE = 60;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(@NonNull HttpServletRequest request,
+                                    @NonNull HttpServletResponse response,
+                                    @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         String clientIp = getClientIp(request);
 
-        // نحصل على دلو هذا الـ IP أو ننشئ واحداً جديداً إذا لم يكن موجوداً
+        // Retrieve the existing bucket for this IP, or create a new one
         Bucket bucket = ipBuckets.computeIfAbsent(clientIp, this::createNewBucket);
 
-        // نحاول استهلاك رمز واحد من الدلو
+        // Try to consume one token — succeeds if the bucket is not empty
         if (bucket.tryConsume(1)) {
-            // يوجد رمز - نكمل معالجة الطلب
+            // Token consumed successfully — let the request through
             filterChain.doFilter(request, response);
         } else {
-            // الدلو فارغ - نرفض الطلب بـ 429
+            // Bucket is empty — reject with 429
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setContentType("application/json");
             response.getWriter().write(
@@ -54,8 +54,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
     }
 
-    // إنشاء دلو جديد لـ IP جديد
-    // يبدأ ممتلئاً بـ 60 رمزاً ويُعاد ملؤه بـ 60 رمزاً كل دقيقة
+    // Create a new bucket for a new IP address
+    // Starts full and refills at the same rate it is capped at
     private Bucket createNewBucket(String ip) {
         Bandwidth limit = Bandwidth.builder()
                 .capacity(MAX_REQUESTS_PER_MINUTE)
@@ -64,11 +64,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return Bucket.builder().addLimit(limit).build();
     }
 
-    // نحصل على IP الحقيقي للعميل حتى لو كان خلف proxy أو load balancer
+    // Extract the real client IP even when the app is behind a proxy or load balancer
     private String getClientIp(HttpServletRequest request) {
         String xForwardedFor = request.getHeader("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            // X-Forwarded-For قد يحتوي على عدة IPs - نأخذ الأول (الأصلي)
+            // X-Forwarded-For may contain multiple IPs — the first one is the original client
             return xForwardedFor.split(",")[0].trim();
         }
         return request.getRemoteAddr();

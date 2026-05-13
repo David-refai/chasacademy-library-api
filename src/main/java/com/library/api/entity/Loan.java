@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
 
-// كيان الاستعارة - يربط مستخدماً بكتاب معيّن لفترة محددة
+// Represents a book loan — links a user to a borrowed book for a specific period
 @Entity
 @Table(name = "loans")
 @Getter
@@ -18,23 +18,23 @@ public class Loan {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // الكتاب المُستعار - FetchType.LAZY يعني أننا لا نجلب بيانات الكتاب من DB إلا عند الحاجة
+    // FetchType.LAZY means book data is not loaded from DB unless explicitly accessed
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "book_id", nullable = false)
     private Book book;
 
-    // المستخدم الذي استعار الكتاب
+    // The user who borrowed the book
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private AppUser user;
 
-    // تاريخ الاستعارة - يُعيَّن تلقائياً عند إنشاء السجل
+    // Set automatically when the loan is created
     private LocalDate loanDate;
 
-    // تاريخ الإعادة المتوقع - يجب أن يكون في المستقبل
+    // Must be a future date — validated in LoanRequestDto
     private LocalDate dueDate;
 
-    // false = الكتاب لم يُعَد بعد، true = تمّت الإعادة
+    // false = book is still checked out, true = book has been returned
     @Builder.Default
     private boolean returned = false;
 }

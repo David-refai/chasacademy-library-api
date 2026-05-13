@@ -4,8 +4,8 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cache.annotation.EnableCaching;
 
-// نقطة البداية للتطبيق
-// @EnableCaching تُفعّل ميزة التخزين المؤقت (Cache) في كل مكان في التطبيق
+// Entry point for the Library API application
+// @EnableCaching activates Spring's caching abstraction so @Cacheable annotations work
 @SpringBootApplication
 @EnableCaching
 public class LibraryApiApplication {

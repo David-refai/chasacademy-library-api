@@ -3,20 +3,20 @@ package com.library.api.dto;
 import lombok.Data;
 import java.time.LocalDate;
 
-// بيانات الاستعارة التي تُرسَل للعميل
+// Loan data returned to the client
 @Data
 public class LoanResponseDto {
 
     private Long id;
     private Long bookId;
 
-    // عنوان الكتاب لسهولة القراءة - لا نُرسل المعرف فقط
+    // Book title included for readability — avoids a second API call just to get the title
     private String bookTitle;
     private String username;
 
     private LocalDate loanDate;
     private LocalDate dueDate;
 
-    // هل أُعيد الكتاب أم لا
+    // Whether the book has been returned
     private boolean returned;
 }

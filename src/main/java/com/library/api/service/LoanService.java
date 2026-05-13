@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 
-// منطق الأعمال لاستعارة وإعادة الكتب
+// Business logic for borrowing and returning books
 @Service
 @RequiredArgsConstructor
 public class LoanService {
@@ -21,7 +21,7 @@ public class LoanService {
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
 
-    // استعارة كتاب: يُنشئ سجل استعارة ويُعلّم الكتاب كـ "غير متاح"
+    // Borrow a book: creates a loan record and marks the book as unavailable
     @Transactional
     public LoanResponseDto borrowBook(LoanRequestDto request) {
         Book book = bookRepository.findById(request.getBookId())
@@ -31,7 +31,8 @@ public class LoanService {
             throw new IllegalStateException("Book '" + book.getTitle() + "' is currently on loan");
         }
 
-        // نحصل على بيانات المستخدم المُسجَّل الدخول من الـ SecurityContext
+        // Get the currently logged-in user from the SecurityContext
+        // The JwtFilter placed the user there after validating the token
         AppUser currentUser = getCurrentUser();
 
         Loan loan = Loan.builder()
@@ -42,14 +43,14 @@ public class LoanService {
                 .returned(false)
                 .build();
 
-        // نُعلّم الكتاب كغير متاح حتى لا يستطيع شخص آخر استعارته
+        // Mark the book as unavailable so nobody else can borrow it
         book.setAvailable(false);
         bookRepository.save(book);
 
         return mapToResponse(loanRepository.save(loan));
     }
 
-    // إعادة كتاب: يُعلّم الاستعارة كمنتهية ويُعيد الكتاب للرف
+    // Return a book: marks the loan as returned and puts the book back on the shelf
     @Transactional
     public LoanResponseDto returnBook(Long loanId) {
         Loan loan = loanRepository.findById(loanId)
@@ -60,26 +61,25 @@ public class LoanService {
         }
 
         loan.setReturned(true);
-        loan.getBook().setAvailable(true);   // نُعيد الكتاب للرف
+        loan.getBook().setAvailable(true);   // Put the book back on the shelf
         bookRepository.save(loan.getBook());
 
         return mapToResponse(loanRepository.save(loan));
     }
 
-    // استعارات المستخدم الحالي مع pagination
+    // Get the current user's active loans — paginated
     public Page<LoanResponseDto> getMyLoans(Pageable pageable) {
         AppUser currentUser = getCurrentUser();
         return loanRepository.findByUserAndReturnedFalse(currentUser, pageable)
                 .map(this::mapToResponse);
     }
 
-    // كل الاستعارات في النظام - للمدير فقط
+    // Get all loans in the system — admin use only
     public Page<LoanResponseDto> getAllLoans(Pageable pageable) {
         return loanRepository.findAll(pageable).map(this::mapToResponse);
     }
 
-    // نحصل على المستخدم المُسجَّل دخوله من الـ SecurityContext
-    // الـ JwtFilter وضع المستخدم هناك بعد التحقق من الـ token
+    // Retrieve the AppUser entity for the currently authenticated user
     private AppUser getCurrentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String username = auth.getName();

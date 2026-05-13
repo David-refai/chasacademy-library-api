@@ -8,9 +8,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface LoanRepository extends JpaRepository<Loan, Long> {
 
-    // استعارات مستخدم معيّن التي لم تُعَد بعد - مع pagination
+    // Active (not-yet-returned) loans for a specific user — paginated
     Page<Loan> findByUserAndReturnedFalse(AppUser user, Pageable pageable);
 
-    // هل هذا الكتاب مُستعار حالياً من شخص آخر؟
+    // Check if a book is currently checked out by anyone
     boolean existsByBookIdAndReturnedFalse(Long bookId);
 }

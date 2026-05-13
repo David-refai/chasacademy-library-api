@@ -9,13 +9,13 @@ import org.springframework.web.client.RestTemplate;
 import java.util.List;
 import java.util.Map;
 
-// يجلب معلومات الكتب من Open Library API الخارجية
-// يستخدم نمط Circuit Breaker لمعالجة أعطال الـ API بشكل آمن (VG)
+// Fetches book metadata from the Open Library external API
+// Uses the Circuit Breaker pattern to handle external API failures gracefully (VG)
 //
-// كيف يعمل Circuit Breaker (قاطع الدائرة):
-// CLOSED (مغلق) = الـ API يعمل بشكل طبيعي - نُرسل الطلبات
-// OPEN (مفتوح)  = الـ API فشل كثيراً - نتوقف عن الإرسال وندعو fallback مباشرة
-// HALF-OPEN     = ننتظر ونُرسل طلباً تجريبياً لنرى هل عاد الـ API للعمل
+// Circuit Breaker states:
+// CLOSED  — API is healthy, all requests pass through normally
+// OPEN    — too many failures detected, fallback is called immediately without hitting the API
+// HALF-OPEN — after a wait period, a few test requests are sent to check if the API recovered
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -23,21 +23,21 @@ public class ExternalBookService {
 
     private final RestTemplate restTemplate;
 
-    // هذا الاسم يجب أن يطابق الـ instance المُعرَّف في application.yml
+    // This name must match the instance defined in application.yml under resilience4j.circuitbreaker
     private static final String CIRCUIT_BREAKER_NAME = "openLibrary";
 
-    // Open Library API مجاني ولا يتطلب مفتاح API
+    // Open Library API is free and requires no API key
     private static final String OPEN_LIBRARY_URL = "https://openlibrary.org/search.json?isbn=%s&limit=1";
 
-    // @CircuitBreaker: إذا فشلت الدالة عدة مرات متتالية، تُفتح الدائرة
-    // وتُستدعى fallbackBookInfo مباشرةً بدون محاولة الاتصال بالـ API
+    // @CircuitBreaker: if this method fails repeatedly, the circuit opens
+    // and fallbackBookInfo is called immediately without attempting the real HTTP request
     @CircuitBreaker(name = CIRCUIT_BREAKER_NAME, fallbackMethod = "fallbackBookInfo")
     public Map<String, Object> getBookInfoByIsbn(String isbn) {
         log.info("Fetching book info from Open Library API for ISBN: {}", isbn);
 
         String url = String.format(OPEN_LIBRARY_URL, isbn);
 
-        // هذا الطلب قد يفشل إذا كان الـ API خارج الخدمة
+        // This HTTP call may fail if the external service is down
         @SuppressWarnings("unchecked")
         Map<String, Object> response = restTemplate.getForObject(url, Map.class);
 
@@ -45,16 +45,16 @@ public class ExternalBookService {
             return Map.of("numFound", 0, "docs", List.of());
         }
 
-        log.info("Open Library returned {} results for ISBN: {}", response.get("numFound"), isbn);
+        log.info("Open Library returned {} result(s) for ISBN: {}", response.get("numFound"), isbn);
         return response;
     }
 
-    // Fallback: يُستدعى تلقائياً عندما تُفتح الدائرة أو عند أي خطأ
-    // يجب أن تكون نفس معاملات الدالة الأصلية + Throwable في النهاية
+    // Called automatically when the circuit is open or when any exception occurs
+    // Must have the same parameters as the main method plus a Throwable at the end
     public Map<String, Object> fallbackBookInfo(String isbn, Throwable throwable) {
-        log.warn("Open Library API is unavailable for ISBN: {}. Reason: {}", isbn, throwable.getMessage());
+        log.warn("Open Library API unavailable for ISBN: {}. Reason: {}", isbn, throwable.getMessage());
 
-        // نُعيد رداً آمناً بدلاً من رمي خطأ للعميل
+        // Return a safe default response — the client never sees an unhandled error
         return Map.of(
                 "message", "External book service is temporarily unavailable. Please try again later.",
                 "isbn", isbn,

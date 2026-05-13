@@ -8,53 +8,53 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.util.Date;
 
-// أداة إنشاء والتحقق من JWT tokens
-// JWT = JSON Web Token - وسيلة آمنة لحمل معلومات المستخدم بين الطلبات
-// الـ token مُوقَّع رقمياً فلا يمكن تزويره بدون المفتاح السري
+// Utility class for creating and validating JWT tokens
+// JWT = JSON Web Token — a compact, digitally signed way to carry user identity
+// The token is signed with a secret key, so it cannot be forged without it
 @Component
 public class JwtUtil {
 
-    // المفتاح السري لتوقيع الـ token - يأتي من Vault أو application.yml
+    // Secret key used to sign the token — loaded from Vault or application.yml
     @Value("${app.jwt.secret}")
     private String jwtSecret;
 
-    // مدة صلاحية الـ token بالميلي ثانية (افتراضياً 24 ساعة)
+    // Token validity period in milliseconds (default: 24 hours)
     @Value("${app.jwt.expiration-ms:86400000}")
     private long jwtExpirationMs;
 
-    // تحويل السلسلة النصية إلى مفتاح تشفير
+    // Convert the secret string into a cryptographic signing key
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
     }
 
-    // إنشاء token جديد بعد تسجيل الدخول بنجاح
+    // Generate a new JWT token after a successful login
     public String generateToken(String username, String role) {
         return Jwts.builder()
                 .subject(username)
-                .claim("role", role)                              // نضيف الدور كبيانات إضافية
-                .issuedAt(new Date())                            // وقت الإنشاء
+                .claim("role", role)                              // Role stored as a custom claim
+                .issuedAt(new Date())                            // Token creation timestamp
                 .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
-                .signWith(getSigningKey())                       // التوقيع الرقمي
+                .signWith(getSigningKey())                       // HMAC-SHA256 digital signature
                 .compact();
     }
 
-    // استخراج اسم المستخدم من الـ token
+    // Extract the username from a valid token
     public String extractUsername(String token) {
         return parseClaims(token).getSubject();
     }
 
-    // التحقق من أن الـ token صالح وغير منتهي الصلاحية وغير مُزوَّر
+    // Returns true if the token is valid (not expired and not tampered with)
     public boolean isTokenValid(String token) {
         try {
             parseClaims(token);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
-            // الـ token منتهي الصلاحية أو مُزوَّر أو فارغ
+            // Token is expired, forged, or malformed
             return false;
         }
     }
 
-    // فكّ تشفير الـ token واستخراج محتواه
+    // Parse the token and extract its payload (claims)
     private Claims parseClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())

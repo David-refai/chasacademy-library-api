@@ -9,7 +9,7 @@ import org.springframework.security.authentication.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-// منطق تسجيل الدخول وإنشاء الحسابات
+// Handles user registration and login logic
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -19,13 +19,13 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
 
-    // إنشاء حساب جديد بدور مستخدم عادي
+    // Register a new account with the ROLE_USER role by default
     public AuthResponseDto register(AuthRequestDto request) {
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new IllegalArgumentException("Username already taken: " + request.getUsername());
         }
 
-        // نُشفّر كلمة المرور قبل الحفظ - لا نحفظ كلمات المرور كنص عادي أبداً
+        // Hash the password before saving — never store plain-text passwords
         AppUser newUser = AppUser.builder()
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
@@ -34,15 +34,14 @@ public class AuthService {
 
         userRepository.save(newUser);
 
-        // نُعيد token مباشرةً حتى يتمكن المستخدم من الاستخدام فور التسجيل
+        // Return a token immediately so the user is logged in right after registering
         String token = jwtUtil.generateToken(newUser.getUsername(), newUser.getRole());
         return new AuthResponseDto(token, newUser.getUsername(), newUser.getRole());
     }
 
-    // التحقق من بيانات الدخول وإعادة JWT token
+    // Verify credentials and return a JWT token on success
     public AuthResponseDto login(AuthRequestDto request) {
-        // AuthenticationManager يتحقق من اسم المستخدم وكلمة المرور تلقائياً
-        // يرمي BadCredentialsException تلقائياً إذا كانت البيانات خاطئة
+        // AuthenticationManager automatically throws BadCredentialsException on wrong credentials
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
         );

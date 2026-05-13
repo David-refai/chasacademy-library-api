@@ -4,7 +4,6 @@ import com.library.api.security.JwtFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.*;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -19,11 +18,11 @@ import org.springframework.web.cors.*;
 
 import java.util.List;
 
-// الإعداد الرئيسي لأمان التطبيق
-// يحدد من يستطيع الوصول لأي endpoint ويُدمج الـ JWT مع Spring Security
+// Main security configuration for the application
+// Defines which endpoints are public, which require authentication, and how JWT is integrated
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity   // يُفعّل @PreAuthorize في الـ controllers
+@EnableMethodSecurity   // Enables @PreAuthorize annotations in controllers
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -33,60 +32,60 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-                // نُعطّل CSRF لأن REST APIs لا تستخدم sessions - الـ JWT يتولى الأمان
+                // CSRF is disabled because stateless REST APIs use JWT, not cookies
                 .csrf(csrf -> csrf.disable())
 
-                // نُطبّق سياسة CORS المُحددة في corsConfigurationSource()
+                // Apply the CORS policy defined in corsConfigurationSource()
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
-                // نُحدد من يستطيع الوصول لأي endpoint
+                // Define access rules per endpoint
                 .authorizeHttpRequests(auth -> auth
-                        // /api/auth/** مفتوح للجميع (تسجيل الدخول وإنشاء حساب)
+                        // Login and registration are open to everyone
                         .requestMatchers("/api/auth/**").permitAll()
-                        // H2 console مفتوح فقط في بيئة التطوير
+                        // H2 console is open in development only
                         .requestMatchers("/h2-console/**").permitAll()
-                        // health check مفتوح للمراقبة
+                        // Health check endpoint is public for monitoring tools
                         .requestMatchers("/actuator/health").permitAll()
-                        // كل شيء آخر يتطلب JWT token صالح
+                        // Every other endpoint requires a valid JWT token
                         .anyRequest().authenticated()
                 )
 
-                // لا نستخدم sessions - كل طلب يحمل الـ JWT معه
+                // Stateless sessions — each request must carry its own JWT token
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
 
-                // نُضيف JwtFilter قبل فلتر Spring الافتراضي للمصادقة
+                // Run JwtFilter before Spring's default username/password filter
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
 
-                // نسمح بـ H2 console frames (في الإنتاج يجب تعطيل هذا)
+                // Allow H2 console iframes (disable in production)
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))
 
                 .build();
     }
 
-    // سياسة CORS - تُحدد أي مصادر (origins) يمكنها إرسال طلبات للـ API
-    // CORS يمنع مواقع خبيثة من إرسال طلبات نيابةً عن المستخدم
+    // CORS configuration — controls which origins, methods, and headers are allowed
+    // Prevents malicious websites from sending requests on behalf of the user
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         var config = new CorsConfiguration();
 
-        // نسمح فقط لهذه العناوين بالوصول (أضف عنوان الإنتاج هنا)
+        // Only allow requests from these specific origins (replace with production URL)
         config.setAllowedOrigins(List.of(
-                "http://localhost:3000",    // واجهة React
-                "http://localhost:4200"     // واجهة Angular
+                "http://localhost:3000",    // React frontend
+                "http://localhost:4200"     // Angular frontend
         ));
 
-        // نحدد الـ HTTP methods المسموح بها
+        // Restrict to these HTTP methods only
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
 
-        // نسمح بـ Authorization header لإرسال الـ JWT token
+        // Allow the Authorization header so clients can send the JWT token
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
 
-        // يسمح للمتصفح بإرسال الـ cookies مع الطلبات عبر المصادر المختلفة
+        // Allow credentials (cookies) in cross-origin requests
         config.setAllowCredentials(true);
 
-        // المتصفح يُخزّن نتيجة CORS preflight لمدة ساعة (1 hour)
+        // Browser can cache the CORS preflight response for 1 hour
         config.setMaxAge(3600L);
 
         var source = new UrlBasedCorsConfigurationSource();
@@ -94,13 +93,13 @@ public class SecurityConfig {
         return source;
     }
 
-    // BCrypt: خوارزمية تشفير كلمات المرور - القوة 12 تعني الأمان الجيد مع أداء مقبول
+    // BCrypt with cost factor 12 — strong security with acceptable performance
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(12);
     }
 
-    // AuthenticationManager يُستخدم في AuthService للتحقق من بيانات تسجيل الدخول
+    // Used by AuthService to verify login credentials
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
             throws Exception {

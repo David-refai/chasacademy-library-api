@@ -3,27 +3,27 @@ package com.library.api.dto;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 
-// البيانات المطلوبة لإنشاء كتاب جديد أو تعديل كتاب موجود
-// كل حقل له قواعد تحقق تُرفض تلقائياً إذا لم تُحقَّق
+// Input required to create a new book or update an existing one
+// Each field has validation rules that Spring enforces automatically via @Valid
 @Data
 public class BookRequestDto {
 
-    // العنوان مطلوب ولا يتجاوز 255 حرفاً
+    // Title is required and cannot exceed 255 characters
     @NotBlank(message = "Title is required")
     @Size(max = 255, message = "Title cannot exceed 255 characters")
     private String title;
 
-    // اسم المؤلف مطلوب
+    // Author name is required
     @NotBlank(message = "Author is required")
     @Size(max = 255, message = "Author name cannot exceed 255 characters")
     private String author;
 
-    // ISBN يجب أن يكون 13 رقماً بالضبط (معيار ISBN-13)
+    // ISBN must be exactly 13 digits (ISBN-13 international standard)
     @NotBlank(message = "ISBN is required")
     @Pattern(regexp = "^\\d{13}$", message = "ISBN must be exactly 13 digits")
     private String isbn;
 
-    // سنة النشر بين 1000 و 2100 (لتجنب القيم المنطقياً مستحيلة)
+    // Published year must be between 1000 and 2100 to reject obviously invalid values
     @Min(value = 1000, message = "Published year must be at least 1000")
     @Max(value = 2100, message = "Published year seems too far in the future")
     private Integer publishedYear;

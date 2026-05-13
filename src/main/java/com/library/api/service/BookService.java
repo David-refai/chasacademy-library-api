@@ -9,17 +9,17 @@ import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// منطق الأعمال لإدارة الكتب
-// يستخدم Redis Cache لتسريع الاستعلامات المتكررة
+// Business logic for book management
+// Uses Spring Cache annotations to store frequently accessed books in Redis
 @Service
 @RequiredArgsConstructor
 public class BookService {
 
     private final BookRepository bookRepository;
 
-    // @Cacheable: في أول مرة يُجلب الكتاب من DB ويُخزَّن في Redis
-    // في المرات التالية يُرجَع مباشرةً من Redis بدون استعلام DB
-    // المفتاح = id الكتاب، اسم الـ cache = "books" (مُعرَّف في RedisConfig)
+    // @Cacheable: first call hits the database and stores the result in Redis.
+    // All subsequent calls for the same ID return the cached result without any DB query.
+    // Cache name "books" is configured with a 30-minute TTL in RedisConfig.
     @Cacheable(value = "books", key = "#id")
     public BookResponseDto getBookById(Long id) {
         Book book = bookRepository.findById(id)
@@ -27,13 +27,13 @@ public class BookService {
         return mapToResponse(book);
     }
 
-    // Pageable يسمح للعميل بطلب صفحة معينة بدلاً من كل السجلات دفعة واحدة
-    // مثال: GET /api/books?page=0&size=10&sort=title,asc
+    // Pageable lets the client request a specific page instead of all records at once
+    // Example: GET /api/books?page=0&size=10&sort=title,asc
     public Page<BookResponseDto> getAllBooks(Pageable pageable) {
         return bookRepository.findAll(pageable).map(this::mapToResponse);
     }
 
-    // بحث حسب المؤلف مع pagination
+    // Search by author with pagination
     public Page<BookResponseDto> getBooksByAuthor(String author, Pageable pageable) {
         return bookRepository.findByAuthor(author, pageable).map(this::mapToResponse);
     }
@@ -55,8 +55,8 @@ public class BookService {
         return mapToResponse(bookRepository.save(book));
     }
 
-    // @CachePut: يُحدّث البيانات في DB ويُحدّث الـ cache في نفس الوقت
-    // بدونه سيبقى الـ cache قديماً حتى ينتهي الـ TTL
+    // @CachePut: updates the database AND refreshes the cache entry with the new data
+    // Without this, the cache would serve stale data until the TTL expires
     @CachePut(value = "books", key = "#id")
     @Transactional
     public BookResponseDto updateBook(Long id, BookRequestDto request) {
@@ -70,8 +70,8 @@ public class BookService {
         return mapToResponse(bookRepository.save(book));
     }
 
-    // @CacheEvict: يحذف سجل الكتاب من الـ cache عند حذفه من DB
-    // بدونه سيستمر الـ cache بإرجاع بيانات كتاب محذوف
+    // @CacheEvict: removes the book's cache entry when it is deleted from the database
+    // Without this, the cache would keep returning a deleted book until the TTL expires
     @CacheEvict(value = "books", key = "#id")
     @Transactional
     public void deleteBook(Long id) {
@@ -81,7 +81,7 @@ public class BookService {
         bookRepository.deleteById(id);
     }
 
-    // تحويل الكيان (Entity) إلى DTO لتجنب تسريب التفاصيل الداخلية للعميل
+    // Map a Book entity to a DTO to avoid exposing internal entity structure to clients
     private BookResponseDto mapToResponse(Book book) {
         var dto = new BookResponseDto();
         dto.setId(book.getId());
