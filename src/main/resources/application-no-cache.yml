@@ -1,0 +1,8 @@
+spring:
+  cache:
+    # Override cache type to 'none' so every request hits the database directly
+    # Used for benchmarking: run with this profile first to record baseline response times
+    type: none
+  cloud:
+    vault:
+      enabled: false  # Skip Vault connection when running without infrastructure
