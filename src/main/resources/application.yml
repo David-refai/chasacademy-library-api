@@ -1,0 +1,96 @@
+spring:
+  application:
+    name: library-api
+
+  # ===== قاعدة البيانات =====
+  # H2 قاعدة بيانات في الذاكرة - لا تحتاج تثبيتاً، تبدأ مع التطبيق وتُحذف عند إيقافه
+  datasource:
+    url: jdbc:h2:mem:librarydb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      # create-drop: يُنشئ جداول عند البدء ويحذفها عند الإيقاف (مثالي للتطوير)
+      # في الإنتاج: استخدم validate أو none
+      ddl-auto: create-drop
+    show-sql: false  # اجعلها true إذا أردت رؤية استعلامات SQL في السجل
+
+  # H2 console لفحص البيانات عبر المتصفح: http://localhost:8080/h2-console
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  # ===== Redis (التخزين المؤقت) =====
+  # Redis مخزن بيانات سريع في الذاكرة - يُسرّع الاستعلامات المتكررة
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms  # إذا لم يستجب Redis خلال ثانيتين، يُعطي خطأ
+
+  # نوع الـ cache: redis = يستخدم Redis، simple = في الذاكرة (للتطوير بدون Redis)
+  cache:
+    type: redis
+
+  # ===== Spring Vault (إدارة الأسرار) =====
+  # Vault يُخزّن المعلومات الحساسة خارج الكود مثل كلمات المرور ومفاتيح API
+  # optional: يعني التطبيق يعمل حتى لو Vault غير متاح
+  config:
+    import: "optional:vault://"
+
+  cloud:
+    vault:
+      enabled: true
+      host: ${VAULT_HOST:localhost}
+      port: ${VAULT_PORT:8200}
+      scheme: http
+      authentication: token
+      token: ${VAULT_TOKEN:dev-root-token}
+      kv:
+        enabled: true
+        backend: secret
+        # Spring سيقرأ الأسرار من المسار: secret/library-api
+        default-context: library-api
+
+# ===== JWT =====
+# في الإنتاج، يجب أن يأتي JWT_SECRET من Vault وليس من هنا
+# الأمر للحفظ في Vault: vault kv put secret/library-api app.jwt.secret="your-strong-secret"
+app:
+  jwt:
+    secret: ${JWT_SECRET:library-api-super-secret-key-minimum-256-bits-long-for-hmac-sha256}
+    expiration-ms: 86400000  # مدة صلاحية الـ token: 24 ساعة
+
+# ===== Actuator (مراقبة التطبيق) =====
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# ===== Circuit Breaker (Resilience4j) - VG =====
+resilience4j:
+  circuitbreaker:
+    instances:
+      openLibrary:
+        # يُسجّل صحة الـ circuit في /actuator/health
+        register-health-indicator: true
+        # نحسب نسبة الفشل من آخر 10 طلبات
+        sliding-window-size: 10
+        # إذا فشل 50% من الطلبات، تُفتح الدائرة (يتوقف عن الاتصال)
+        failure-rate-threshold: 50
+        # ننتظر 30 ثانية قبل المحاولة مجدداً
+        wait-duration-in-open-state: 30s
+        # في حالة HALF-OPEN، نُرسل 3 طلبات تجريبية فقط
+        permitted-number-of-calls-in-half-open-state: 3
+
+logging:
+  level:
+    com.library.api: INFO
+    org.springframework.security: WARN
