@@ -32,7 +32,7 @@ spring:
       port: ${REDIS_PORT:6379}
       timeout: 2000ms  # If Redis does not respond within 2 seconds, fail fast
 
-  # Cache type: redis = use Redis, simple = in-memory fallback (no Redis needed)
+  # Cache type: redis = use Redis (default), none = bypass cache entirely (for benchmarking)
   cache:
     type: redis
 
