@@ -34,9 +34,19 @@ A secure, high-performance REST API for library management built with Spring Boo
 docker-compose up -d
 ```
 
-### Step 2: Store JWT Secret in Vault (optional)
+### Step 2: Provide a JWT Secret
 
-If Vault is running, store the JWT secret there instead of using the default value:
+`JWT_SECRET` has no fallback value (see [SECURITY_REPORT.md](SECURITY_REPORT.md) — OWASP A02 fix:
+a working default secret committed to a public repo would let anyone forge a valid admin token).
+Provide it one of two ways:
+
+**Option A — environment variable (fastest for local dev):**
+
+```bash
+export JWT_SECRET="my-super-secret-key-at-least-256-bits-long-for-security"
+```
+
+**Option B — Vault (if `docker-compose up -d` is running):**
 
 ```bash
 export VAULT_ADDR='http://localhost:8200'
@@ -46,7 +56,8 @@ vault kv put secret/library-api \
   app.jwt.secret="my-super-secret-key-at-least-256-bits-long-for-security"
 ```
 
-> If you skip this step, the app uses the default secret from `application.yml`.
+> Without either, the app refuses to start with: `Could not resolve placeholder 'JWT_SECRET'`.
+> This is intentional — fail closed instead of silently running with a known secret.
 
 ### Step 3: Start the Application
 
@@ -193,10 +204,63 @@ curl -X POST http://localhost:8080/api/books \
 
 ## H2 Console (Database Inspector)
 
+Disabled by default (OWASP A05 fix — see [SECURITY_REPORT.md](SECURITY_REPORT.md)): an open H2
+console with no login lets anyone run arbitrary SQL against the database. To inspect data locally:
+
+```bash
+export H2_CONSOLE_ENABLED=true
+```
+
 - URL: http://localhost:8080/h2-console
 - JDBC URL: `jdbc:h2:mem:librarydb`
 - Username: `sa`
 - Password: _(leave blank)_
+
+Even when enabled, the console now requires a valid JWT like every other endpoint — it's no longer
+reachable directly from a browser tab with no `Authorization` header.
+
+---
+
+## Run with Docker
+
+The app ships with a multi-stage `Dockerfile` — no local Java installation needed. Start Redis
+first (and optionally Vault) via `docker-compose up -d`, then:
+
+```bash
+docker build -t library-api .
+
+docker run --network library-api_default -p 8080:8080 \
+  -e JWT_SECRET=replace-with-a-long-random-secret \
+  -e REDIS_HOST=library-redis \
+  library-api
+```
+
+---
+
+## CI/CD Pipeline
+
+`.github/workflows/ci-cd-pipeline.yml` runs on every push/PR to `main`:
+
+1. **build-and-test** — runs `mvn test`.
+2. **dependency-check** — runs OWASP Dependency-Check; fails the pipeline on any High/Critical (CVSS ≥ 7) vulnerability.
+3. **docker-build-push** *(push to `main` only)* — builds the image and pushes `:latest` and `:<sha>` to Docker Hub.
+4. **deploy** *(push to `main` only)* — fully automated deployment step.
+
+To enable steps 3–4, add these **Repository Secrets** (Settings → Secrets and variables → Actions):
+
+| Secret | Required | Purpose |
+|---|---|---|
+| `DOCKERHUB_USERNAME` | Yes | Docker Hub login |
+| `DOCKERHUB_TOKEN` | Yes | Docker Hub access token (not your password) |
+| `NVD_API_KEY` | Optional | Speeds up the OWASP Dependency-Check NVD feed download |
+| `DEPLOY_WEBHOOK_URL` | Optional | If set, the deploy job POSTs to it (e.g. a Render/Railway deploy hook) |
+
+---
+
+## Security
+
+See [SECURITY_REPORT.md](SECURITY_REPORT.md) for the OWASP Top 10 analysis behind the JWT secret,
+H2 console, and dependency-scanning fixes added for Individuell Labb 2k5.
 
 ---
 
