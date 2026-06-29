@@ -19,9 +19,12 @@ spring:
     show-sql: false  # Set to true to print SQL queries to the console
 
   # H2 web console — inspect data in the browser at http://localhost:8080/h2-console
+  # Disabled by default (OWASP A05 fix): an open H2 console lets anyone run
+  # arbitrary SQL with no login. Opt in locally with H2_CONSOLE_ENABLED=true —
+  # never enable it in a deployed environment.
   h2:
     console:
-      enabled: true
+      enabled: ${H2_CONSOLE_ENABLED:false}
       path: /h2-console
 
   # ===== REDIS (CACHING) =====
@@ -57,11 +60,13 @@ spring:
         default-context: library-api
 
 # ===== JWT =====
-# In production, app.jwt.secret should come from Vault, not from this file
-# Store it with: vault kv put secret/library-api app.jwt.secret="your-strong-secret"
+# No fallback value here on purpose (OWASP A02 fix): a working default secret
+# checked into a public repo lets anyone forge a valid admin token. JWT_SECRET
+# must be supplied via Vault or an environment variable, or the app refuses to
+# start. Store it with: vault kv put secret/library-api app.jwt.secret="..."
 app:
   jwt:
-    secret: ${JWT_SECRET:library-api-super-secret-key-minimum-256-bits-long-for-hmac-sha256}
+    secret: ${JWT_SECRET}
     expiration-ms: 86400000  # Token validity: 24 hours
 
 # ===== ACTUATOR (MONITORING) =====

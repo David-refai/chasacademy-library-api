@@ -42,11 +42,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Login and registration are open to everyone
                         .requestMatchers("/api/auth/**").permitAll()
-                        // H2 console is open in development only
-                        .requestMatchers("/h2-console/**").permitAll()
                         // Health check endpoint is public for monitoring tools
                         .requestMatchers("/actuator/health").permitAll()
-                        // Every other endpoint requires a valid JWT token
+                        // H2 console (OWASP A05 fix): no longer permitAll. It's disabled by
+                        // default (see application.yml) and even when opted into locally via
+                        // H2_CONSOLE_ENABLED, it now requires a valid JWT like everything else
+                        // instead of being open to anyone with no login.
                         .anyRequest().authenticated()
                 )
 
@@ -57,9 +58,6 @@ public class SecurityConfig {
 
                 // Run JwtFilter before Spring's default username/password filter
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-
-                // Allow H2 console iframes (disable in production)
-                .headers(headers -> headers.frameOptions(frame -> frame.disable()))
 
                 .build();
     }
